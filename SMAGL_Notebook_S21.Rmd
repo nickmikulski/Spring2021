@@ -1,7 +1,7 @@
 ---
 title: "SMAGL Notebook - Spring 2021"
 author: "Nick Mikulski"
-date: "2/9/2021"
+date: "2/5/2021"
 output:
   html_document:
     toc: true
@@ -29,29 +29,30 @@ Given that my main academic interests are in conservation biology, I look forwar
 - Using the rehabilitated vervet monkey dataset, analyze the social networks of the pre-release and post-release populations
 - Compare pre-release and post-release networks to look for patterns such as rank and centrality and to identify possible vulnerabilities in the network
 
-## Learning to use SNA R Packages
+# Learning to use SNA R Packages
+
+## Walk through of: McFarland *et al.* 2010    
+[McFarland DA, Messing S, Nowak M, Westwood SJ. (2010) Network Analysis Labs in R and SoNIA.](https://sna.stanford.edu/rlabs.php)  
+    
+
+**Inputting Data from website**   
+source("http://sna.stanford.edu/setup.R")    
+install.packages("igraph")   
+library(igraph)   
+
 ```{r}
-
-
-```
-
-### Working Through Stanford SNA Reference
-source("http://sna.stanford.edu/setup.R")
-
-install.packages("igraph")
-
-library(igraph)
-
 advice_data_frame <- read.table('http://sna.stanford.edu/sna_R_labs/data/Krack-High-Tec-edgelist-Advice.txt')
 friendship_data_frame <- read.table('http://sna.stanford.edu/sna_R_labs/data/Krack-High-Tec-edgelist-Friendship.txt')
 reports_to_data_frame <- read.table('http://sna.stanford.edu/sna_R_labs/data/Krack-High-Tec-edgelist-ReportsTo.txt')
 
 head(advice_data_frame)
-fix(advice_data_frame)
 
 attributes <- read.csv('http://sna.stanford.edu/sna_R_labs/data/Krack-High-Tec-Attributes.csv', header=T)
 attributes
+```
 
+Adding column names for organization
+```{r}
 colnames(advice_data_frame) <- c('ego', 'alter', 'advice_tie')
 head(advice_data_frame)
   
@@ -60,25 +61,34 @@ head(friendship_data_frame)
   
 colnames(reports_to_data_frame) <- c('ego', 'alter', 'reports_to_tie')
 head(reports_to_data_frame)
+```
 
-fix(advice_data_frame)
-fix(friendship_data_frame)
-fix(reports_to_data_frame)
+These lines open the partial data frames in an XQuartz window, but I took out of chunk because it was messing up the knitting of the file.   
+    
+fix(advice_data_frame)   
+fix(friendship_data_frame)   
+fix(reports_to_data_frame)    
 
-advice_data_frame$ego == friendship_data_frame$ego   
-#This confirms that our columns and rows align before combining the data set
+Confirms that our columns and rows align before combining the data set:
+```{r}
+advice_data_frame$ego == friendship_data_frame$ego
+
 which(advice_data_frame$ego != friendship_data_frame$ego)
 which(advice_data_frame$alter != friendship_data_frame$alter)
 which(reports_to_data_frame$alter != friendship_data_frame$alter)
 which(reports_to_data_frame$ego != friendship_data_frame$ego)
+```
 
-#Combining them into one data frame:
+Combining them into one data frame:
+```{r}
 krack_full_data_frame <- cbind(advice_data_frame, 
     friendship_data_frame$friendship_tie, 
     reports_to_data_frame$reports_to_tie)
 head(krack_full_data_frame)
+```
 
-#Rename to organize better:
+Rename columns to organize better:
+```{r}
 names(krack_full_data_frame)[4:5] <- c("friendship_tie", 
     "reports_to_tie")  
 head(krack_full_data_frame)
@@ -86,92 +96,177 @@ head(krack_full_data_frame)
 krack_full_nonzero_edges <- subset(krack_full_data_frame, 
     (advice_tie > 0 | friendship_tie > 0 | reports_to_tie > 0))
 head(krack_full_nonzero_edges)
+```
 
-#To Graph:
+Reduce to only non-zero edges to only contain actual connections:
+```{r}
+library(igraph) #Unsure why, but it fails every time if not reloaded within the chunk
 krack_full <- graph.data.frame(krack_full_nonzero_edges) 
 summary(krack_full)
 krack_full
+```
 
+Create vectors of specific edge types:
+```{r}
 get.edge.attribute(krack_full, 'advice_tie')
 get.edge.attribute(krack_full, 'friendship_tie')
 get.edge.attribute(krack_full, 'reports_to_tie')
-
+```
+Symmetrize the network, making all asymmetric ties symmetric:
+```{r}
 krack_full_symmetrized <- as.undirected(krack_full, mode='collapse')
 summary(krack_full_symmetrized)
+```
 
-attributes = cbind(1:length(attributes[,1]), attributes)
+**Adding Attributes to the Graph**    
+Create a vector of vertex labels
+```{r}
+attributes = cbind(1:length(attributes[,1]), attributes) #I'm a little confused on the arguments within esp the [,1]
 krack_full <- graph.data.frame(d = krack_full_nonzero_edges, 
                                vertices = attributes)
 
-summary(krack_full)
 
+#Attributes (age, tensure, level, and dept) are now listed alongside name as vertex attributes
+summary(krack_full)
+```
+?cbind
+
+List all values for a given attribute
+```{r}
 get.vertex.attribute(krack_full, 'AGE')
 get.vertex.attribute(krack_full, 'TENURE')
 get.vertex.attribute(krack_full, 'LEVEL')
 get.vertex.attribute(krack_full, 'DEPT')
+```
 
-#Saves plotted graph as a pdf:
-setwd("/users/nickmikulski/Desktop/SMAGL/Spring2021")
+    
+**Visualizing the network**   
+Plot of initial network
+```{r}
+plot(krack_full)
+
+```
+    
+Saves plotted graph as a pdf:    
+```{r}
+setwd("/users/nickmikulski/Desktop/SMAGL/Spring2021") #set working directory to define where pdf will be save to
 pdf("1.1_Krackhardt_Full.pdf")
 plot(krack_full)
-dev.off()
+dev.off() #this line ends the pdf save process?
 
-krack_advice_only <- delete.edges(krack_full, 
-    E(krack_full)[get.edge.attribute(krack_full,
+```
+
+?delete.edges
+  (graph, edges-to-be-deleted)
+
+?E
+
+?get.edge.attribute
+
+This network is very messy and unclear, so the lines below reduce to just one edge type in the network.   
+```{r}
+#First, just the advice edges
+krack_advice_only <- delete.edges(krack_full, #delete edges within krack_full:
+    E(krack_full)[get.edge.attribute(krack_full, #E(krack_full) gives all edges; [get. argument keeps just the advice edges
     name = "advice_tie") == 0])
 summary(krack_advice_only)
-pdf("1.2_Krackhardt_Advice.pdf")
-plot(krack_advice_only)
-dev.off()
+plot(krack_advice_only) #still very messy
 
+#Friendship edges only
 krack_friendship_only <- delete.edges(krack_full, 
     E(krack_full)[get.edge.attribute(krack_full, 
     name = "friendship_tie") == 0])
 summary(krack_friendship_only)
-pdf("1.3_Krackhardt_Friendship.pdf")
 plot(krack_friendship_only)
-dev.off()
 
+#Reports to edges only
 krack_reports_to_only <- delete.edges(krack_full, 
     E(krack_full)[get.edge.attribute(krack_full, 
     name = "reports_to_tie") == 0])
 summary(krack_reports_to_only)
-pdf("1.4_Krackhardt_Reports.pdf")
-plot(krack_reports_to_only)
-dev.off()
+plot(krack_reports_to_only) #This is very interesting. It is definitely the most orderly network, which makes sense for "reports to."
+```
 
+I hope to be able to create a network similar to this with our real data to be able to see which individual vervets are central to the group.    
+
+In order to further visually clean up the networks, we can use a preset layout on our advice-only network
+I will be following the layout Fruchterman-Rheingold just to follow along with this source, but others can be found at ?layout.    
+```{r}
 reports_to_layout <- layout.fruchterman.reingold(krack_reports_to_only)
-pdf("1.5_Krackhardt_Reports_Fruchterman_Reingold.pdf")
 plot(krack_reports_to_only, 
-     layout=reports_to_layout)
-dev.off()
+     layout=reports_to_layout) #All this really did was re-order the primary connections with the largest sub-networks at bottom
+```
 
-dept_vertex_colors = get.vertex.attribute(krack_full,"DEPT")
+Further customize plot    
+First, make a vector of colors.   
+```{r}
+dept_vertex_colors = get.vertex.attribute(krack_full,"DEPT") #color-coding by department
 colors = c('Black', 'Red', 'Blue', 'Yellow', 'Green')
 dept_vertex_colors[dept_vertex_colors == 0] = colors[1]
 dept_vertex_colors[dept_vertex_colors == 1] = colors[2]
 dept_vertex_colors[dept_vertex_colors == 2] = colors[3]
 dept_vertex_colors[dept_vertex_colors == 3] = colors[4] 
 dept_vertex_colors[dept_vertex_colors == 4] = colors[5]
- 
-pdf("1.6_Krackhardt_Reports_Color.pdf") 
+
 plot(krack_reports_to_only, 
     layout=reports_to_layout, 
-    vertex.color=dept_vertex_colors, 
-    vertex.label=NA, 
-    edge.arrow.size=.5)
-dev.off() 
+    vertex.color=dept_vertex_colors, #color-coding vertices by vector above
+    vertex.label=NA, #removing vertex labels
+    edge.arrow.size=.5) #making the arrows smaller
 
-tenure_vertex_sizes = get.vertex.attribute(krack_full,"TENURE")
+tenure_vertex_sizes = get.vertex.attribute(krack_full,"TENURE") #changing vertex size to represent tenure attribute
  
-pdf("1.7_Krackhardt_Reports_Vertex_Size.pdf") 
 plot(krack_reports_to_only, 
      layout=reports_to_layout, 
      vertex.color=dept_vertex_colors, 
      vertex.label=NA, 
      edge.arrow.size=.5,
      vertex.size=tenure_vertex_sizes)
-dev.off() 
+```
+      
+That was really satisfying to be able to customize the visuals of the network.   
+Next, I will overlay this network with the other edge types: advice & friendships in red and blue using the same layout   
+
+?rgb (red, blue, alpha, names=NULL, maxColorValue=1) where alpha is opacity (0=transparent, 1=opaque)
+
+```{r}
+tie_type_colors = c(rgb(1,0,0,.5), rgb(0,0,1,.5), rgb(0,0,0,.5)) #creates red, blue, grey(?)
+E(krack_full)$color[ E(krack_full)$advice_tie==1 ] = tie_type_colors[1]
+E(krack_full)$color[ E(krack_full)$friendship_tie==1 ] = tie_type_colors[2]
+E(krack_full)$color[ E(krack_full)$reports_to_tie==1 ] = tie_type_colors[3]
+E(krack_full)$arrow.size=.5 
+V(krack_full)$color = dept_vertex_colors
+V(krack_full)$frame = dept_vertex_colors
+ 
+plot(krack_full, 
+     layout=reports_to_layout, 
+     vertex.color=dept_vertex_colors, 
+     vertex.label=NA, 
+     edge.arrow.size=.5,
+     vertex.size=tenure_vertex_sizes)
+
+```
+   
+Lastly, I will add a legend to improve read-ability (place legend function immediately after)
+```{r}
+plot(krack_full, 
+     layout=reports_to_layout, 
+     vertex.color=dept_vertex_colors, 
+     vertex.label=NA, 
+     edge.arrow.size=.5,
+     vertex.size=tenure_vertex_sizes)
+legend(1, 
+       1.25,
+       legend = c('Advice', 
+                  'Friendship',
+                  'Reports To'), 
+       col = tie_type_colors, 
+       lty=1,
+       cex = .7)
+
+```
+
+Yay! This network is complete.
 
 # Citations
 
@@ -185,8 +280,8 @@ dev.off()
 
 ## Social Network Analysis Literature
 
-- Brent LJN, Lehmann J, Ramos-Fernández G. (2011) Social network analysis in the study of nonhuman primates: A historical perspective. *American Journal of Primatology*, **73**, 720-730.  
-- Guy AJ, Stone OML, Curnoe D. (2012) The release of a troop of rehabilitated vervet monkeys (Chlorocebus aethiops) in KwaZulu-Natal, South Africa: Outcomes and Assessment. *Folia Primatologica*, **82**, 308-320.  
-- McCowan B, Anderson K, Heagarty A, Cameron A. (2008) Utility of social network analysis for primate behavioral management and well-being. *Applied Animal Behaviour Science*, **109**, 396-405.  
-- Puga-Gonzalez I, Sosa S, Sueur C. (2019) Editorial: Social networks analyses in primates, a multilevel perspective. *Primates*, **60**, 163-165.  
-- Sueur C, Jacobs A, Amblard F, Petit O, King AJ. (2011) How can social network analysis improve the study of primate behavior? *American Journal of Primatology*, **73**, 703-719.  
+- [Brent LJN, Lehmann J, Ramos-Fernández G. (2011) Social network analysis in the study of nonhuman primates: A historical perspective. *American Journal of Primatology*, **73**, 720-730.](https://doi.org/10.1002/ajp.20949)  
+- [Guy AJ, Stone OML, Curnoe D. (2012) The release of a troop of rehabilitated vervet monkeys (Chlorocebus aethiops) in KwaZulu-Natal, South Africa: Outcomes and Assessment. *Folia Primatologica*, **82**, 308-320.](https://doi.org/10.1159/000337269)  
+- [McCowan B, Anderson K, Heagarty A, Cameron A. (2008) Utility of social network analysis for primate behavioral management and well-being. *Applied Animal Behaviour Science*, **109**, 396-405.](https://doi.org/10.1016/j.applanim.2007.02.009)  
+- [Puga-Gonzalez I, Sosa S, Sueur C. (2019) Editorial: Social networks analyses in primates, a multilevel perspective. *Primates*, **60**, 163-165.](https://doi.org/10.1007/s10329-019-00720-5)  
+- [Sueur C, Jacobs A, Amblard F, Petit O, King AJ. (2011) How can social network analysis improve the study of primate behavior? *American Journal of Primatology*, **73**, 703-719.](https://doi.org/10.1002/ajp.20915)  
