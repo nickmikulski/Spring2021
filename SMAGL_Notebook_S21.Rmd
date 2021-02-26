@@ -419,7 +419,7 @@ get.vertex.attribute(pre_sn_sample_df, 'DEPT')
 
 ?graph_from_data_frame
 
-?graph.data.frame
+?graph.data.frame 
 
 ```{r}
 library(igraph)
