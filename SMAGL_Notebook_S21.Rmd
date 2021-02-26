@@ -266,7 +266,192 @@ legend(1,
 
 ```
 
-Yay! This network is complete.
+Yay! This network is complete. I found this walk-through to be really valuable in preparing to begin constructing a social network of our vervet monkey dataset. I think this will help me a lot with 
+
+
+## Walk through of/Notes on: Sadler 2017    
+[Sadler J. (2017) Introduction to Network Analysis with R.](https://www.jessesadler.com/post/network-analysis-with-r/)      
+
+
+
+
+# Beginning with Vervet Dataset    
+## Getting started with help from Laura   
+[Pre-Release Social Proximity Dataset](https://raw.githubusercontent.com/nickmikulski/Spring2021/main/Pre-release_Social%20Proximity_csv.csv)    
+
+Loading necessary packages (File would not knit without putting these in a chunk)    
+```{r}
+library(curl)
+library(dplyr)
+library(tidyverse)
+
+```
+
+### Inputting Datasets
+```{r}
+pre_socnet<- curl("https://raw.githubusercontent.com/nickmikulski/Spring2021/main/Pre-release_Social%20Proximity_csv.csv")
+pre_socnet<- read.csv(pre_socnet, header = T, na.strings=c(""," ","NA"))
+#head(pre_socnet) #check the data to make sure it's uploaded correctly
+#str(pre_socnet)
+
+post_socnet<- curl("https://raw.githubusercontent.com/langley1/LWTdata2016/main/Post-release_Social%20Proximity.csv")
+post_socnet<- read.csv(post_socnet, header = T, na.strings=c(""," ","NA"))
+#head(post_socnet) #check the data to make sure it's uploaded correctly
+
+```
+   
+### Editting the dataframe
+```{r}
+pre_socnet_close<- pre_socnet %>% #creating a new dataframe called pre_socnet_close using data from the original pre_socnet dataframe
+  filter(Focal.ID != "BT", #this code REMOVES all data that has Batman has the focal ID (BT is wild male from prerelease)
+         Association != "BT", #this code REMOVES all data that has Batman in association column
+         Proximity.Code %in% c("1","2") #this code only keeps proximity codes 1,2 (excluding 3,4) because we are focusing on closer proximity
+  ) 
+
+
+```
+
+### Taking out a sub-sample from dataframe
+This section pulls out a few specific individuals in order to practice coding using the dataframe
+```{r}
+pre_socnet_sample<- pre_socnet_close %>%
+  filter(Focal.ID %in% c("PO","BL","KO","ZI","AM"), Association %in% c("PO","BL","KO","ZI","AM"))
+
+```
+
+### Creating a matrix of sub-sample
+```{r}
+# 1. Create a character vector of all the focal IDs in dataset:
+pre_sn_sample_IDs<-as.character(unique(pre_socnet_sample$Focal.ID))
+pre_sn_sample_IDs
+```
+
+```{r}
+# 2. Get a list of dataframes, subsetted by monkey ID:
+pre_sn_sample_monkeylist<-lapply(pre_sn_sample_IDs, function(x){pre_socnet_sample[pre_socnet_sample[["Focal.ID"]] == x, ]})
+# The line above is a little bit confusing. It is creating a separate dataframe for each individual based on their focal id
+#head(pre_sn_sample_monkeylist) #hidden for knitting
+```
+
+```{r}
+# 3. Group each by focal/associate, and count how many times they are observed close together:
+pre_sn_sample_grouped<-
+  pre_sn_sample_monkeylist %>%
+  purrr::map(~group_by(.,Association)) %>%
+  purrr::map(~summarize(.,count=n())) 
+#pre_sn_sample_grouped
+
+```
+
+?purrr::map # This is pulling the map command from the purrr package    
+?~ # The tilde (dependentvariable~independent)   
+
+```{r}
+names(pre_sn_sample_grouped) <- pre_sn_sample_IDs #this gives each grouped list the name of the Focal ID
+#pre_sn_sample_grouped
+
+# 4. Set up pairwise combinations of interacting monkeys:
+pre_sn_sample_monkeycombos<-list(focal=pre_sn_sample_IDs, associate=pre_sn_sample_IDs) #create list of all possible focals/associates
+pre_sn_sample_filt<- function(x, y) {x == y} #create function to filter out same-monkey pairs ("PO is close to PO")
+pre_sn_sample_combo<- pre_sn_sample_monkeycombos %>% cross_df(.,.filter=pre_sn_sample_filt) #get the filtered combined list as a dataframe
+#head(pre_sn_sample_combo)
+```
+
+?cross_df #
+
+```{r}
+# 5. Create new dataframes with specific criteria
+pre_sn_sample_combo2<-
+  pre_sn_sample_combo %>%
+  mutate(absent1 = map2_chr( #new column called "absent1"
+    focal,
+    associate,
+    ~if_else(.x %in% names(pre_sn_sample_grouped),true="TRUE",false="FALSE"))) %>%
+    mutate(absent2 = map2_chr(
+    focal,
+    associate,
+    ~if_else(.y %in% pre_sn_sample_grouped[[.x]]$Association,true="TRUE",false="FALSE"))) %>%
+  filter(absent1 == "TRUE") %>%
+  filter(absent2 == "TRUE") %>%
+  dplyr::select(-absent1,-absent2) #this removes those two new columns you made so you're just left with the ID names
+
+pre_sn_sample_combo3<- pre_sn_sample_combo2 %>% 
+  mutate(proximity = map2_int( #new column called "proximity" that is the count for when proximity code = 1 or 2
+    focal, 
+    associate, 
+    ~pre_sn_sample_grouped %>% pluck(.x) %>% filter(Association==.y) %>% as.data.frame(.) %>% .[,2]))
+head(pre_sn_sample_combo3)
+
+```
+Finally, create the matrix    
+```{r}
+# 6. Create your matrix
+pre_sn_sample_matrix<-spread(pre_sn_sample_combo3,associate,proximity) %>% column_to_rownames(var="focal") %>% data.matrix()
+pre_sn_sample_matrix
+
+```
+
+?spread
+
+## Creating a social network plot based on this matrix  
+### Converting the matrix into a data frame     
+
+?as.data.frame
+
+
+
+```{r}
+pre_sn_sample_df <- as.data.frame(pre_sn_sample_matrix, row.names = pre_sn_sample_IDs, colnames(pre_sn_sample_IDs), stringsAsFactors = TRUE)
+pre_sn_sample_df
+```
+
+Plotting this newly formed data frame:
+```{r}
+library(igraph)
+
+pre_sn_sample_edges <- pre_sn_sample_df
+pre_sn_sample_nodes <- pre_sn_sample_IDs
+```
+
+```{r}
+get.vertex.attribute(pre_sn_sample_df, 'DEPT')
+```
+
+?graph_from_data_frame
+
+?graph.data.frame
+
+```{r}
+library(igraph)
+pre_sn_sample_graph <- pre_sn_sample_graph <- graph_from_data_frame(d=pre_sn_sample_edges, vertices = pre_sn_sample_nodes, directed = TRUE) #Using the matrix
+
+pre_sn_sample_graph
+
+```
+Alternatives (?):    
+pre_sn_sample_graph <- graph_from_data_frame(d=pre_sn_sample_edges, vertices = pre_sn_sample_nodes, directed = TRUE) #Using the matrix
+
+pre_sn_sample_graph <- graph_from_data_frame(d=(as.data.frame(pre_sn_sample_combo3)), vertices = pre_sn_sample_nodes, directed = TRUE) #using the step before the matrix
+
+
+?plot
+
+```{r}
+plot(pre_sn_sample_graph)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
 
 # Citations
 
