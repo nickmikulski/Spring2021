@@ -275,7 +275,7 @@ Yay! This network is complete. I found this walk-through to be really valuable i
 
 
 
-# Beginning with Vervet Dataset    
+# Beginning with subset of Vervet Dataset       
 ## Getting started with help from Laura   
 [Pre-Release Social Proximity Dataset](https://raw.githubusercontent.com/nickmikulski/Spring2021/main/Pre-release_Social%20Proximity_csv.csv)    
 
@@ -383,6 +383,9 @@ pre_sn_sample_combo3<- pre_sn_sample_combo2 %>%
 head(pre_sn_sample_combo3)
 
 ```
+
+head(pre_sn_sample_combo3)
+
 Finally, create the matrix    
 ```{r}
 # 6. Create your matrix
@@ -396,62 +399,68 @@ pre_sn_sample_matrix
 ## Creating a social network plot based on this matrix  
 ### Converting the matrix into a data frame     
 
-?as.data.frame
-
-
-
 ```{r}
-pre_sn_sample_df <- as.data.frame(pre_sn_sample_matrix, row.names = pre_sn_sample_IDs, colnames(pre_sn_sample_IDs), stringsAsFactors = TRUE)
+pre_sn_sample_df <- as.data.frame(pre_sn_sample_matrix, stringsAsFactors = TRUE, row.names = c("AM", "BL", "KO", "PO", "ZI"), col.names=c("AM", "BL", "KO", "PO", "ZI"))
 pre_sn_sample_df
 ```
 
-Plotting this newly formed data frame:
+### Plotting based on dataframe
 ```{r}
 library(igraph)
 
-pre_sn_sample_edges <- pre_sn_sample_df
-pre_sn_sample_nodes <- pre_sn_sample_IDs
-```
+pre_sn_sample_edges <- pre_sn_sample_df #assigning the matrix data frame to our edges
+pre_sn_sample_nodes <- c("AM", "BL", "KO", "PO", "ZI")
 
-```{r}
-get.vertex.attribute(pre_sn_sample_df, 'DEPT')
-```
+pre_sn_sample_df2 <- as.data.frame(pre_sn_sample_combo3, stringsAsFactors = TRUE, row.names = c("AM", "BL", "KO", "PO", "ZI"))
 
-?graph_from_data_frame
-
-?graph.data.frame 
-
-```{r}
-library(igraph)
-pre_sn_sample_graph <- pre_sn_sample_graph <- graph_from_data_frame(d=pre_sn_sample_edges, vertices = pre_sn_sample_nodes, directed = TRUE) #Using the matrix
-
-pre_sn_sample_graph
+pre_sn_sample_graph <- graph_from_data_frame(d=pre_sn_sample_df2, vertices = pre_sn_sample_nodes, directed = TRUE) #using the step before the matrix
 
 ```
+
+My original intention was to use the matrix that we just created in order to plot the social network, however, I keep getting an error message that says "Some vertex names in edge list are not listed in vertex data frame. I tried trouble shooting this with no success, so I instead tried to work with the dataframe that we created right before the matrix (pre_sn_sample_combo3), and I had some success. Below is how I was originally trying to create the graph using the matrix.
+
 Alternatives (?):    
 pre_sn_sample_graph <- graph_from_data_frame(d=pre_sn_sample_edges, vertices = pre_sn_sample_nodes, directed = TRUE) #Using the matrix
 
-pre_sn_sample_graph <- graph_from_data_frame(d=(as.data.frame(pre_sn_sample_combo3)), vertices = pre_sn_sample_nodes, directed = TRUE) #using the step before the matrix
-
-
-?plot
-
 ```{r}
-plot(pre_sn_sample_graph)
+library(igraph)
 
+proximityw <- as.numeric(unlist(select(pre_sn_sample_combo3, "proximity"))) #Creating a numeric vector from the proximity values in order to visualize in plot
+
+#Trying to categorize by color
+#proxmax <- max(select(pre_sn_sample_combo3, "proximity"), na.rm = TRUE)   
+#proxmin <- min(select(pre_sn_sample_combo3, "proximity"), na.rm = TRUE)   
+#proxrange <- proxmax - proxmin
+#proxquarter <- proxrange/4
+
+pre_sn_sample_colorrange <- colorRampPalette(c("darkred", "yellow")) #establishes color range
+pre_sn_sample_color <- sort(pre_sn_sample_colorrange(length(proximityw))) #how many   
+
+par(bg="white")
+plot(pre_sn_sample_graph,
+     vertex.size=25,
+     vertex.color="lightgrey",
+     vertex.label.color="black",
+     edge.width=((1/15)*(proximityw)), #The thickness of the edges is now related to the proximity strength between indivs
+     edge.curved=0.3,
+     edge.color=(pre_sn_sample_color) #I have been able to assign the color palette, but it is not being applied properly. The thickest lines (strongest proximity value) should be the darkest color and the thinnest (weakest proximity value) should be the lightest color. I've been playing around with this a lot, and cannot figure out how to properly assign the color palette
+     ) 
 
 ```
 
+E(pre_sn_sample_graph)$color <- as.factor(E(pre_sn_sample_graph)$proximity)    
 
-
-
-
-
-
-
-
-
-
+Alternative color coding attempt (unsuccessful):
+colorcat1 <- ((proxmin):(proxmin + (1*proxquarter)))
+colorcat2 <- ((proxmin + 1*proxquarter):(proxmin + (2*proxquarter)))
+colorcat3 <- ((proxmin + (2*proxquarter)):(proxmin + (3*proxquarter)))
+colorcat4 <- ((proxmin + (3*proxquarter)):proxmax)
+pre_sn_sample_colors = get.vertex.attribute(pre_sn_sample_graph, "proximity") #color coding by proximity level
+colors = c('black', 'yellow', 'orange', 'red')
+pre_sn_sample_colors[pre_sn_sample_colors = colorcat1] = colors[1]
+pre_sn_sample_colors[pre_sn_sample_colors = colorcat2] = colors[2]
+pre_sn_sample_colors[pre_sn_sample_colors = colorcat3] = colors[3]
+pre_sn_sample_colors[pre_sn_sample_colors = colorcat4] = colors[4]
 
 # Citations
 
